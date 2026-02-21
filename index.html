@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Journey Forge Tasks</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; min-height: 100vh; }
+        
+        .header { background: linear-gradient(135deg, #0ea5e9, #8b5cf6); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; }
+        .header-btn { background: white; color: #0f172a; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+        
+        .agent-bar { background: #1e293b; padding: 14px 40px; display: flex; gap: 14px; overflow-x: auto; border-bottom: 1px solid #334155; }
+        .agent-pill { display: flex; align-items: center; gap: 6px; padding: 6px 14px; background: #0f172a; border-radius: 20px; font-size: 12px; white-space: nowrap; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; }
+        .active { background: #10b981; }
+        .busy { background: #f59e0b; }
+        .offline { background: #64748b; }
+        
+        .kanban { display: flex; gap: 20px; padding: 24px 40px; overflow-x: auto; }
+        .column { flex: 1; min-width: 260px; max-width: 300px; }
+        .column-header { padding: 12px 16px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; }
+        .todo { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .inprogress { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .done { background: linear-gradient(135deg, #10b981, #059669); }
+        .column-header h2 { font-size: 13px; font-weight: 700; }
+        .task-count { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+        
+        .task-list { min-height: 100px; }
+        .task-card { background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #334155; cursor: pointer; transition: 0.2s; }
+        .task-card:hover { border-color: #475569; transform: translateY(-1px); }
+        .task-title { font-weight: 600; font-size: 13px; margin-bottom: 6px; line-height: 1.4; }
+        .task-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tag { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+        .priority-high { background: #fee2e2; color: #dc2626; }
+        .priority-medium { background: #fef3c7; color: #d97706; }
+        .priority-low { background: #dbeafe; color: #2563eb; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #1e293b; border-radius: 12px; padding: 24px; width: 100%; max-width: 420px; }
+        .modal h2 { font-size: 16px; margin-bottom: 16px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: #94a3b8; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: white; font-size: 14px; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #0ea5e9; }
+        .form-group textarea { min-height: 80px; }
+        .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; border: none; font-size: 13px; }
+        .btn-primary { background: linear-gradient(135deg, #0ea5e9, #8b5cf6); color: white; }
+        .btn-secondary { background: #334155; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        
+        .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .detail-title { font-size: 18px; font-weight: 700; }
+        .detail-close { background: none; border: none; color: #64748b; font-size: 20px; cursor: pointer; }
+        .detail-section { margin-bottom: 14px; }
+        .detail-section h3 { font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+        .detail-content { font-size: 13px; line-height: 1.5; color: #cbd5e1; }
+        .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+        
+        .loading { text-align: center; padding: 40px; color: #64748b; }
+        .error { text-align: center; padding: 20px; color: #ef4444; }
+        
+        .refresh-btn { background: none; border: none; color: white; cursor: pointer; margin-left: 10px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Journey Forge Tasks <button class="refresh-btn" onclick="loadTasks()" title="Refresh">🔄</button></h1>
+        <button class="header-btn" onclick="openModal()">+ Add Task</button>
+    </div>
+    
+    <div class="agent-bar">
+        <div class="agent-pill"><span class="dot active"></span>🤖 Potential Bot</div>
+        <div class="agent-pill"><span class="dot busy"></span>✍️ Content Chief</div>
+        <div class="agent-pill"><span class="dot busy"></span>📱 Social Media</div>
+        <div class="agent-pill"><span class="dot offline"></span>🔍 SEO Specialist</div>
+        <div class="agent-pill"><span class="dot active"></span>📊 Market Analyst</div>
+        <div class="agent-pill"><span class="dot active"></span>🎨 Creative Designer</div>
+        <div class="agent-pill"><span class="dot offline"></span>🌐 Web Developer</div>
+    </div>
+    
+    <div class="kanban">
+        <div class="column">
+            <div class="column-header todo">
+                <h2>📋 To Do</h2>
+                <span class="task-count" id="todo-count">0</span>
+            </div>
+            <div class="task-list" id="todo"></div>
+        </div>
+        <div class="column">
+            <div class="column-header inprogress">
+                <h2>🔥 In Progress</h2>
+                <span class="task-count" id="inprogress-count">0</span>
+            </div>
+            <div class="task-list" id="inprogress"></div>
+        </div>
+        <div class="column">
+            <div class="column-header done">
+                <h2>✅ Done</h2>
+                <span class="task-count" id="done-count">0</span>
+            </div>
+            <div class="task-list" id="done"></div>
+        </div>
+    </div>
+    
+    <!-- Add Task Modal -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <h2>Add New Task</h2>
+            <form id="taskForm">
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="taskTitle" placeholder="Task title..." required>
+                </div>
+                <div class="form-group">
+                    <label>Priority</label>
+                    <select id="taskPriority">
+                        <option value="">None</option>
+                        <option value="high-priority">🔴 High</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="low">🔵 Low</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Assignee</label>
+                    <select id="taskAssignee">
+                        <option value="@umairaito">🤖 Potential Bot</option>
+                        <option value="content-chief">✍️ Content Chief</option>
+                        <option value="social-lead">📱 Social Media</option>
+                        <option value="seo">🔍 SEO Specialist</option>
+                        <option value="analyst">📊 Market Analyst</option>
+                        <option value="designer">🎨 Creative Designer</option>
+                        <option value="developer">🌐 Web Developer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description & Requirements</label>
+                    <textarea id="taskDesc" placeholder="Describe the task and requirements..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Detail Modal -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="detail-header">
+                <div class="detail-title" id="detailTitle"></div>
+                <button class="detail-close" onclick="closeDetailModal()">×</button>
+            </div>
+            <div class="detail-tags" id="detailTags"></div>
+            <div class="detail-section">
+                <h3>Description</h3>
+                <div class="detail-content" id="detailDesc"></div>
+            </div>
+            <div class="detail-section">
+                <h3>Created</h3>
+                <div class="detail-content" id="detailCreated"></div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-danger" onclick="closeDetailModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const REPO = 'umairaito/journeyforge-tasks';
+        const API = `https://api.github.com/repos/${REPO}`;
+        
+        let issues = [];
+        
+        async function loadTasks() {
+            document.getElementById('todo').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('inprogress').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('done').innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`${API}/issues?state=all&per_page=100`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json' }
+                });
+                issues = await response.json();
+                renderTasks();
+            } catch (e) {
+                document.getElementById('todo').innerHTML = '<div class="error">Error loading tasks</div>';
+            }
+        }
+        
+        function renderTasks() {
+            const todo = issues.filter(i => !i.labels.some(l => l.name === 'in-progress') && !i.labels.some(l => l.name === 'done'));
+            const inprogress = issues.filter(i => i.labels.some(l => l.name === 'in-progress'));
+            const done = issues.filter(i => i.labels.some(l => l.name === 'done'));
+            
+            document.getElementById('todo').innerHTML = todo.map(renderCard).join('') || '<div class="loading">No tasks</div>';
+            document.getElementById('inprogress').innerHTML = inprogress.map(renderCard).join('') || '<div class="loading">No tasks</div>';
+            document.getElementById('done').innerHTML = done.map(renderCard).join('') || '<div class="loading">No tasks</div>';
+            
+            document.getElementById('todo-count').textContent = todo.length;
+            document.getElementById('inprogress-count').textContent = inprogress.length;
+            document.getElementById('done-count').textContent = done.length;
+        }
+        
+        function renderCard(issue) {
+            const priority = issue.labels.find(l => l.name === 'high-priority');
+            const assignee = issue.assignee ? issue.assignee.login : 'unassigned';
+            return `
+                <div class="task-card" onclick="openDetail(${issue.number})">
+                    <div class="task-title">#${issue.number} ${issue.title}</div>
+                    <div class="task-meta">
+                        ${priority ? `<span class="tag priority-high">🔴 High</span>` : ''}
+                        <span class="tag" style="background:#f3e8ff;color:#7c3aed">${assignee}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function openDetail(number) {
+            const issue = issues.find(i => i.number === number);
+            if (!issue) return;
+            
+            document.getElementById('detailTitle').textContent = issue.title;
+            document.getElementById('detailDesc').textContent = issue.body || 'No description';
+            document.getElementById('detailCreated').textContent = new Date(issue.created_at).toLocaleString();
+            
+            const tags = issue.labels.map(l => `<span class="tag" style="background:#${l.color}20;color:#${l.color}">${l.name}</span>`).join('');
+            document.getElementById('detailTags').innerHTML = tags;
+            
+            document.getElementById('detailModal').classList.add('active');
+        }
+        
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+        
+        function openModal() {
+            document.getElementById('modal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+            document.getElementById('taskForm').reset();
+        }
+        
+        document.getElementById('taskForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            
+            const title = document.getElementById('taskTitle').value;
+            const priority = document.getElementById('taskPriority').value;
+            const assignee = document.getElementById('taskAssignee').value;
+            const body = document.getElementById('taskDesc').value;
+            
+            const labels = ['todo'];
+            if (priority) labels.push(priority);
+            
+            try {
+                await fetch(`${API}/issues`, {
+                    method: 'POST',
+                    headers: { 
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title, body, labels,
+                        assignees: assignee !== '@umairaito' ? [assignee] : []
+                    })
+                });
+                closeModal();
+                loadTasks();
+            } catch (e) {
+                alert('Error creating task');
+            }
+        });
+        
+        document.getElementById('modal').addEventListener('click', e => {
+            if (e.target.id === 'modal') closeModal();
+        });
+        
+        document.getElementById('detailModal').addEventListener('click', e => {
+            if (e.target.id === 'detailModal') closeDetailModal();
+        });
+        
+        loadTasks();
+    </script>
+</body>
+</html>
